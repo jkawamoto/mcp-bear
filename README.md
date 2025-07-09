@@ -47,7 +47,7 @@ To configure this server for Claude Desktop, edit the `claude_desktop_config.jso
 ```json
 {
   "mcpServers": {
-    "youtube-transcript": {
+    "bear": {
       "command": "uvx",
       "args": [
         "--from",
