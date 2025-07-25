@@ -10,6 +10,8 @@ A MCP server for interacting with [Bear](https://bear.app/) note-taking software
 <a href="https://glama.ai/mcp/servers/2gg54jdwwv"><img width="380" height="200" src="https://glama.ai/mcp/servers/2gg54jdwwv/badge" alt="Bear Server MCP server" /></a>
 
 ## Installation
+> [!NOTE]
+> You'll need [`uv`](https://docs.astral.sh/uv) installed on your system to use `uvx` command.
 
 ### For Goose CLI
 To enable the Bear extension in Goose CLI,
