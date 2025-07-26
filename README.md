@@ -3,13 +3,14 @@
 [![GitHub License](https://img.shields.io/github/license/jkawamoto/mcp-bear)](https://github.com/jkawamoto/mcp-bear/blob/main/LICENSE)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![smithery badge](https://smithery.ai/badge/@jkawamoto/mcp-bear)](https://smithery.ai/server/@jkawamoto/mcp-bear)
 
 A MCP server for interacting with [Bear](https://bear.app/) note-taking software.
 
 <a href="https://glama.ai/mcp/servers/2gg54jdwwv"><img width="380" height="200" src="https://glama.ai/mcp/servers/2gg54jdwwv/badge" alt="Bear Server MCP server" /></a>
 
 ## Installation
+> [!NOTE]
+> You'll need [`uv`](https://docs.astral.sh/uv) installed on your system to use `uvx` command.
 
 ### For Goose CLI
 To enable the Bear extension in Goose CLI,
@@ -63,13 +64,6 @@ To configure this server for Claude Desktop, edit the `claude_desktop_config.jso
 After editing, restart the application.
 For more information,
 see: [For Claude Desktop Users - Model Context Protocol](https://modelcontextprotocol.io/quickstart/user).
-
-#### Installing via Smithery
-To install Bear MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@jkawamoto/mcp-bear):
-
-```bash
-npx -y @smithery/cli install @jkawamoto/mcp-bear --client claude
-```
 
 ## Actions Implemented
 
