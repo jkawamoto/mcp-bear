@@ -65,6 +65,11 @@ After editing, restart the application.
 For more information,
 see: [For Claude Desktop Users - Model Context Protocol](https://modelcontextprotocol.io/quickstart/user).
 
+### For LM Studio
+To configure this server for LM Studio, click the button below.
+
+[![Add MCP Server bear to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](https://lmstudio.ai/install-mcp?name=bear&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJnaXQraHR0cHM6Ly9naXRodWIuY29tL2prYXdhbW90by9tY3AtYmVhciIsIm1jcC1iZWFyIiwiLS10b2tlbiIsIjxZT1VSX1RPS0VOPiJdfQ%3D%3D)
+
 ## Actions Implemented
 
 The server supports the following actions.
