@@ -22,10 +22,16 @@ from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.shared.context import RequestContext
 
-from mcp_bear import server, AppContext, BASE_URL
+from mcp_bear import server, AppContext, BASE_URL, Note, NoteID, NoteInfo, ModifiedNote
 from mcp_bear.cli import generate_file_suffix
 
 BEAR_TOKEN = "abcdefg"
+
+
+def _encode_tags(obj: dict) -> dict:
+    if "tags" in obj:
+        obj["tags"] = json.dumps(obj["tags"])
+    return obj
 
 
 @pytest.fixture
@@ -102,16 +108,19 @@ async def test_open_note(
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
-    note_body = "test note" * 16 * 1024  # > 16KB
-    mock_webbrowser.stubbed_queries = {
-        "note": note_body,
-        "identifier": "1234567890",
-        "title": "test note",
-        "tags": ["a", "b"],
-    }
+    expect = Note(
+        note="test note" * 16 * 1024,  # > 16KB
+        identifier="1234567890",
+        title="test note",
+        tags=["a", "b"],
+        modificationDate="2023-01-01T00:00:00Z",
+        creationDate="2023-01-01T00:00:00Z",
+        body="test note",
+    )
+    mock_webbrowser.stubbed_queries = _encode_tags(expect.model_dump())
 
     res = await s._tool_manager.call_tool("open_note", arguments=arguments, context=ctx)
-    assert res == note_body
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -165,14 +174,11 @@ async def test_create(
     expect_req_params: dict,
 ) -> None:
     s, ctx = mcp_server
-
-    mock_webbrowser.stubbed_queries = {
-        "identifier": "1234567890",
-        "title": "test title",
-    }
+    expect = NoteID(identifier="1234567890", title="test title")
+    mock_webbrowser.stubbed_queries = expect.model_dump()
 
     res = await s._tool_manager.call_tool("create", arguments=arguments, context=ctx)
-    assert res == "1234567890"
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -230,14 +236,11 @@ async def test_replace_note(
     expect_req_params: dict,
 ) -> None:
     s, ctx = mcp_server
-
-    mock_webbrowser.stubbed_queries = {
-        "note": "updated note",
-        "title": "test title",
-    }
+    expect = ModifiedNote(note="updated note", title="test title")
+    mock_webbrowser.stubbed_queries = expect.model_dump()
 
     res = await s._tool_manager.call_tool("replace_note", arguments=arguments, context=ctx)
-    assert res == "updated note"
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -314,18 +317,25 @@ async def test_open_tag(
     mock_webbrowser: MagicMock,
 ) -> None:
     s, ctx = mcp_server
+    expect = [
+        NoteInfo(
+            title="note a",
+            identifier="1",
+            tags=["test", "data"],
+            modificationDate="2023-01-01T00:00:00Z",
+            creationDate="2023-01-01T00:00:00Z",
+        ),
+        NoteInfo(
+            title="note b", identifier="2", modificationDate="2023-01-01T00:00:00Z", creationDate="2023-01-01T00:00:00Z"
+        ),
+    ]
 
     mock_webbrowser.stubbed_queries = {
-        "notes": json.dumps(
-            [
-                {"title": "note a", "identifier": "1"},
-                {"title": "note b", "identifier": "2"},
-            ]
-        )
+        "notes": json.dumps([info.model_dump() for info in expect]),
     }
 
     res = await s._tool_manager.call_tool("open_tag", arguments={"name": "test_tag"}, context=ctx)
-    assert res == ["note a (ID: 1)", "note b (ID: 2)"]
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -501,18 +511,23 @@ async def test_untagged(
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
+    expect = [
+        NoteInfo(
+            title="note a",
+            identifier="1",
+            tags=["test", "data"],
+            modificationDate="2023-01-01T00:00:00Z",
+            creationDate="2023-01-01T00:00:00Z",
+        ),
+        NoteInfo(
+            title="note b", identifier="2", modificationDate="2023-01-01T00:00:00Z", creationDate="2023-01-01T00:00:00Z"
+        ),
+    ]
 
-    mock_webbrowser.stubbed_queries = {
-        "notes": json.dumps(
-            [
-                {"title": "note a", "identifier": "1"},
-                {"title": "note b", "identifier": "2"},
-            ]
-        )
-    }
+    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("untagged", arguments=arguments, context=ctx)
-    assert res == ["note a (ID: 1)", "note b (ID: 2)"]
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -546,18 +561,23 @@ async def test_todo(
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
+    expect = [
+        NoteInfo(
+            title="note a",
+            identifier="1",
+            tags=["test", "data"],
+            modificationDate="2023-01-01T00:00:00Z",
+            creationDate="2023-01-01T00:00:00Z",
+        ),
+        NoteInfo(
+            title="note b", identifier="2", modificationDate="2023-01-01T00:00:00Z", creationDate="2023-01-01T00:00:00Z"
+        ),
+    ]
 
-    mock_webbrowser.stubbed_queries = {
-        "notes": json.dumps(
-            [
-                {"title": "note a", "identifier": "1"},
-                {"title": "note b", "identifier": "2"},
-            ]
-        )
-    }
+    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("todo", arguments=arguments, context=ctx)
-    assert res == ["note a (ID: 1)", "note b (ID: 2)"]
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -591,18 +611,23 @@ async def test_today(
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
+    expect = [
+        NoteInfo(
+            title="note a",
+            identifier="1",
+            tags=["test", "data"],
+            modificationDate="2023-01-01T00:00:00Z",
+            creationDate="2023-01-01T00:00:00Z",
+        ),
+        NoteInfo(
+            title="note b", identifier="2", modificationDate="2023-01-01T00:00:00Z", creationDate="2023-01-01T00:00:00Z"
+        ),
+    ]
 
-    mock_webbrowser.stubbed_queries = {
-        "notes": json.dumps(
-            [
-                {"title": "note a", "identifier": "1"},
-                {"title": "note b", "identifier": "2"},
-            ]
-        )
-    }
+    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("today", arguments=arguments, context=ctx)
-    assert res == ["note a (ID: 1)", "note b (ID: 2)"]
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -636,18 +661,23 @@ async def test_locked(
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
+    expect = [
+        NoteInfo(
+            title="note a",
+            identifier="1",
+            tags=["test", "data"],
+            modificationDate="2023-01-01T00:00:00Z",
+            creationDate="2023-01-01T00:00:00Z",
+        ),
+        NoteInfo(
+            title="note b", identifier="2", modificationDate="2023-01-01T00:00:00Z", creationDate="2023-01-01T00:00:00Z"
+        ),
+    ]
 
-    mock_webbrowser.stubbed_queries = {
-        "notes": json.dumps(
-            [
-                {"title": "note a", "identifier": "1"},
-                {"title": "note b", "identifier": "2"},
-            ]
-        )
-    }
+    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("locked", arguments=arguments, context=ctx)
-    assert res == ["note a (ID: 1)", "note b (ID: 2)"]
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -683,17 +713,23 @@ async def test_search(
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {
-        "notes": json.dumps(
-            [
-                {"title": "note a", "identifier": "1"},
-                {"title": "note b", "identifier": "2"},
-            ]
-        )
-    }
+    expect = [
+        NoteInfo(
+            title="note a",
+            identifier="1",
+            tags=["test", "data"],
+            modificationDate="2023-01-01T00:00:00Z",
+            creationDate="2023-01-01T00:00:00Z",
+        ),
+        NoteInfo(
+            title="note b", identifier="2", modificationDate="2023-01-01T00:00:00Z", creationDate="2023-01-01T00:00:00Z"
+        ),
+    ]
+
+    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("search", arguments=arguments, context=ctx)
-    assert res == ["note a (ID: 1)", "note b (ID: 2)"]
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
@@ -727,16 +763,15 @@ async def test_grab_url(
     tags: list[str] | None,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {
-        "identifier": "1234567890",
-        "title": "test title",
-    }
+    expect = NoteID(identifier="1234567890", title="test title")
+
+    mock_webbrowser.stubbed_queries = expect.model_dump()
 
     arguments = {"url": "https://bear.app"}
     arguments.update({"tags": tags} if tags else {})
 
     res = await s._tool_manager.call_tool("grab_url", arguments=arguments, context=ctx)
-    assert res == "1234567890"
+    assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
     req_params = {
