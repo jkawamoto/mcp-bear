@@ -63,6 +63,11 @@ filename = "pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
+[[tool.bumpversion.files]]
+filename = "manifest.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true

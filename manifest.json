@@ -1,0 +1,117 @@
+{
+  "dxt_version": "0.1",
+  "name": "mcp-bear",
+  "display_name": "Bear MCP Server",
+  "version": "0.4.0",
+  "description": "A MCP server for interacting with Bear note-taking software.",
+  "author": {
+    "name": "Junpei Kawamoto",
+    "email": "kawamoto.junpei.s64@kyoto-u.jp",
+    "url": "https://github.com/jkawamoto"
+  },
+  "homepage": "https://github.com/jkawamoto/mcp-bear",
+  "documentation": "https://github.com/jkawamoto/mcp-bear",
+  "support": "https://github.com/jkawamoto/mcp-bear/issues",
+  "server": {
+    "type": "python",
+    "entry_point": "src/mcp_bear/__main__.py",
+    "mcp_config": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "${__dirname}",
+        "mcp-bear"
+      ],
+      "env": {
+        "BEAR_API_TOKEN": "${user_config.bear_api_token}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "open_note",
+      "description": "Open a note identified by its title or id and return its content."
+    },
+    {
+      "name": "create",
+      "description": "Create a new note and return its unique identifier. Empty notes are not allowed."
+    },
+    {
+      "name": "replace_note",
+      "description": "Replace the content of an existing note identified by its id."
+    },
+    {
+      "name": "tags",
+      "description": "Return all the tags currently displayed in Bear\u2019s sidebar."
+    },
+    {
+      "name": "open_tag",
+      "description": "Show all the notes which have a selected tag in bear."
+    },
+    {
+      "name": "rename_tag",
+      "description": "Rename an existing tag."
+    },
+    {
+      "name": "delete_tag",
+      "description": "Delete an existing tag."
+    },
+    {
+      "name": "trash",
+      "description": "Move a note to bear trash and select the Trash sidebar item."
+    },
+    {
+      "name": "archive",
+      "description": "Move a note to bear archive and select the Archive sidebar item."
+    },
+    {
+      "name": "untagged",
+      "description": "Select the Untagged sidebar item."
+    },
+    {
+      "name": "todo",
+      "description": "Select the Todo sidebar item."
+    },
+    {
+      "name": "today",
+      "description": "Select the Today sidebar item."
+    },
+    {
+      "name": "locked",
+      "description": "Select the Locked sidebar item."
+    },
+    {
+      "name": "search",
+      "description": "Show search results in Bear for all notes or for a specific tag."
+    },
+    {
+      "name": "grab_url",
+      "description": "Create a new note with the content of a web page and return its unique identifier."
+    }
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ],
+    "runtimes": {
+      "python": ">=3.10"
+    }
+  },
+  "user_config": {
+    "bear_api_token": {
+      "type": "string",
+      "title": "Bear API token",
+      "description": "Bear API token",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "keywords": [
+    "bear"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jkawamoto/mcp-bear"
+  }
+}
