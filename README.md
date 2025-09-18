@@ -42,8 +42,12 @@ refer to the documentation:
 [Using Extensions - MCP Servers](https://block.github.io/goose/docs/getting-started/using-extensions#mcp-servers).
 
 ### For Claude Desktop
-To configure this server for Claude Desktop, edit the `claude_desktop_config.json` file with the following entry under
-`mcpServers`:
+Download the latest MCP bundle `mcp-bear.mcpb` from
+the [Releases](https://github.com/jkawamoto/mcp-bear/releases) page,
+then open the downloaded `.mcpb `file or drag it into the Claude Desktop's Settings window.
+
+You can also manually configure this server for Claude Desktop.
+Edit the `claude_desktop_config.json` file by adding the following entry under `mcpServers`:
 
 ```json
 {
