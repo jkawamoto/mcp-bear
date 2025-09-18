@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.jkawamoto/mcp-bear",
+  "description": "A MCP server for interacting with Bear note-taking software.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/jkawamoto/mcp-bear",
+    "source": "github"
+  },
+  "version": "0.4.0",
+  "packages": [
+    {
+      "registry_type": "mcpb",
+      "identifier": "https://github.com/jkawamoto/mcp-bear/releases/download/v0.4.0/mcp-bear.mcpb",
+      "file_sha256": "f91b513cc189736035e090dd8217a866d4492a53ed094cc277b248890278554e",
+      "version": "0.4.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "description": "Bear API token",
+          "is_required": true,
+          "format": "string",
+          "is_secret": true,
+          "name": "BEAR_API_TOKEN"
+        }
+      ]
+    }
+  ]
+}

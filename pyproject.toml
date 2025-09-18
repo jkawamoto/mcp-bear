@@ -68,6 +68,16 @@ filename = "manifest.json"
 search = '"version": "{current_version}"'
 replace = '"version": "{new_version}"'
 
+[[tool.bumpversion.files]]
+filename = "server.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "server.json"
+search = 'download/v{current_version}'
+replace = 'download/v{new_version}'
+
 [tool.mypy]
 warn_return_any = true
 warn_unused_configs = true
