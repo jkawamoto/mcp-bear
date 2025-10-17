@@ -12,7 +12,7 @@
     {
       "registry_type": "mcpb",
       "identifier": "https://github.com/jkawamoto/mcp-bear/releases/download/v0.4.0/mcp-bear.mcpb",
-      "file_sha256": "f91b513cc189736035e090dd8217a866d4492a53ed094cc277b248890278554e",
+      "file_sha256": "",
       "version": "0.4.0",
       "transport": {
         "type": "stdio"
