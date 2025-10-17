@@ -22,7 +22,6 @@ jobs:
           SHA256_HASH=$(sha256sum "mcp-bear.mcpb" | awk '{print $1}')
           jq --arg hash "$SHA256_HASH" '.packages[0].fileSha256 = $hash' server.json > server_tmp.json
           mv server_tmp.json server.json
-          cat server.json
       - name: Install MCP Publisher
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
