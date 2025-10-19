@@ -6,6 +6,7 @@
 #
 #  http://opensource.org/licenses/mit-license.php
 import asyncio
+import base64
 import json
 import logging
 import webbrowser
@@ -19,6 +20,7 @@ from pathlib import Path
 from typing import cast, AsyncIterator, Final, Any, Mapping
 from urllib.parse import urlencode, quote
 
+import requests
 from fastapi import FastAPI, Request, HTTPException
 from mcp.server import FastMCP
 from mcp.server.fastmcp import Context
@@ -242,6 +244,55 @@ def server(token: str, uds: Path) -> FastMCP:
         try:
             webbrowser.open(f"{BASE_URL}/add-text?{urlencode(params, quote_via=quote)}")
             return ModifiedNote.model_validate(await future)
+
+        finally:
+            del ctx.request_context.lifespan_context.futures[req_id]
+
+    @mcp.tool()
+    async def add_file(
+        ctx: Context[Any, AppContext],
+        id: str | None = Field(description="note unique identifier", default=None),
+        title: str | None = Field(description="note title", default=None),
+        file: str = Field(description="base64 representation of a file or a URL to a file to add to the note"),
+        header: str | None = Field(
+            description="if specified add the file to the corresponding header inside the note", default=None
+        ),
+        filename: str = Field(description="file name with extension"),
+        mode: str | None = Field(description="adding mode (prepend, append)", default=None),
+    ) -> None:
+        """Append or prepend a file to a note identified by its title or id."""
+        req_id = ctx.request_id
+
+        if file.startswith("http://") or file.startswith("https://"):
+            res = requests.get(file)
+            res.raise_for_status()
+            file = base64.b64encode(res.content).decode("ascii")
+
+        params = {
+            "selected": "no",
+            "file": file,
+            "filename": filename,
+            "open_note": "no",
+            "new_window": "no",
+            "show_window": "no",
+            "edit": "no",
+            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
+            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
+        }
+        if id is not None:
+            params["id"] = id
+        if title is not None:
+            params["title"] = title
+        if header is not None:
+            params["header"] = header
+        if mode is not None:
+            params["mode"] = mode
+
+        future = Future[QueryParams]()
+        ctx.request_context.lifespan_context.futures[req_id] = future
+        try:
+            webbrowser.open(f"{BASE_URL}/add-file?{urlencode(sorted(params.items()), quote_via=quote)}")
+            await future
 
         finally:
             del ctx.request_context.lifespan_context.futures[req_id]
