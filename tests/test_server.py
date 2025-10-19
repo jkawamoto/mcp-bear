@@ -97,6 +97,16 @@ def mock_webbrowser_error() -> Generator[MagicMock, None, None]:
         yield mock_open
 
 
+@pytest.fixture
+def mock_requests_get() -> Generator[MagicMock, None, None]:
+    with patch("requests.get") as mock_get:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b"mocked http request"
+        mock_get.return_value = mock_response
+        yield mock_get
+
+
 @pytest.mark.anyio
 @pytest.mark.parametrize(
     "arguments", [{"id": "1234567890"}, {"title": "test note"}, {"id": "1234567890", "title": "test note"}]
@@ -263,6 +273,112 @@ async def test_replace_note_failed(
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
         await s._tool_manager.call_tool("replace_note", arguments={"id": "123456", "text": "new text"}, context=ctx)
+
+    assert "test error message" in str(excinfo.value)
+    assert len(ctx.request_context.lifespan_context.futures) == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "arguments,expect_req_params",
+    [
+        (
+            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt"},
+            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt"},
+        ),
+        (
+            {"title": "sample note", "file": "dGVzdA==", "filename": "test.txt"},
+            {"title": "sample note", "file": "dGVzdA==", "filename": "test.txt"},
+        ),
+        (
+            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "header": "supplement"},
+            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "header": "supplement"},
+        ),
+        (
+            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "mode": "prepend"},
+            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "mode": "prepend"},
+        ),
+    ],
+)
+async def test_add_file(
+    temp_socket: Path,
+    mcp_server: Tuple[FastMCP, Context],
+    mock_webbrowser: MagicMock,
+    arguments: dict,
+    expect_req_params: dict,
+) -> None:
+    s, ctx = mcp_server
+    mock_webbrowser.stubbed_queries = {}
+
+    await s._tool_manager.call_tool("add_file", arguments=arguments, context=ctx)
+    assert len(ctx.request_context.lifespan_context.futures) == 0
+
+    req_params = {
+        "selected": "no",
+        "open_note": "no",
+        "new_window": "no",
+        "show_window": "no",
+        "edit": "no",
+        "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
+        "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
+    }
+    req_params.update(expect_req_params)
+    mock_webbrowser.assert_called_once_with(
+        f"{BASE_URL}/add-file?{urlencode(sorted(req_params.items()), quote_via=quote)}"
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "arguments,expect_req_params",
+    [
+        (
+            {"id": "123456", "file": "http://example.com", "filename": "test.txt"},
+            {"id": "123456", "file": "bW9ja2VkIGh0dHAgcmVxdWVzdA==", "filename": "test.txt"},
+        ),
+        (
+            {"title": "sample note", "file": "https://example.com", "filename": "test.txt"},
+            {"title": "sample note", "file": "bW9ja2VkIGh0dHAgcmVxdWVzdA==", "filename": "test.txt"},
+        ),
+    ],
+)
+async def test_add_file_http_request(
+    temp_socket: Path,
+    mcp_server: Tuple[FastMCP, Context],
+    mock_webbrowser: MagicMock,
+    mock_requests_get: MagicMock,
+    arguments: dict,
+    expect_req_params: dict,
+) -> None:
+    s, ctx = mcp_server
+    mock_webbrowser.stubbed_queries = {}
+
+    await s._tool_manager.call_tool("add_file", arguments=arguments, context=ctx)
+    assert len(ctx.request_context.lifespan_context.futures) == 0
+
+    req_params = {
+        "selected": "no",
+        "open_note": "no",
+        "new_window": "no",
+        "show_window": "no",
+        "edit": "no",
+        "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
+        "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
+    }
+    req_params.update(expect_req_params)
+    mock_webbrowser.assert_called_once_with(
+        f"{BASE_URL}/add-file?{urlencode(sorted(req_params.items()), quote_via=quote)}"
+    )
+    mock_requests_get.assert_called_once_with(arguments["file"])
+
+
+@pytest.mark.anyio
+async def test_add_file_failed(
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+) -> None:
+    s, ctx = mcp_server
+    with pytest.raises(ToolError) as excinfo:
+        await s._tool_manager.call_tool("add_file", arguments={"file": "dGVzdA==", "filename": "test.txt"}, context=ctx)
 
     assert "test error message" in str(excinfo.value)
     assert len(ctx.request_context.lifespan_context.futures) == 0

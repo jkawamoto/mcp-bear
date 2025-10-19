@@ -82,7 +82,7 @@ Refer to Bear's [X-callback-url Scheme documentation](https://bear.app/faq/x-cal
 - [x] /open-note
 - [x] /create
 - [x] /add-text (partially, via the replace_note method)
-- [ ] /add-file
+- [x] /add-file
 - [x] /tags
 - [x] /open-tag
 - [x] /rename-tag
