@@ -135,6 +135,27 @@ class ModifiedNote(BaseModel):
 def server(token: str, uds: Path) -> FastMCP:
     mcp = FastMCP("Bear", lifespan=partial(app_lifespan, uds=uds))
 
+    async def _request(
+        ctx: Context[Any, AppContext],
+        path: str,
+        params: dict[str, str],
+    ) -> QueryParams:
+        req_id = ctx.request_id
+        params = {
+            **params,
+            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
+            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
+        }
+
+        future = Future[QueryParams]()
+        ctx.request_context.lifespan_context.futures[req_id] = future
+        try:
+            webbrowser.open(f"{BASE_URL}/{path}?{urlencode(params, quote_via=quote)}")
+            return await future
+
+        finally:
+            del ctx.request_context.lifespan_context.futures[req_id]
+
     @mcp.tool()
     async def open_note(
         ctx: Context[Any, AppContext],
@@ -142,7 +163,6 @@ def server(token: str, uds: Path) -> FastMCP:
         title: str | None = Field(description="note title", default=None),
     ) -> Note:
         """Open a note identified by its title or id and return its content."""
-        req_id = ctx.request_id
         params = {
             "new_window": "no",
             "float": "no",
@@ -151,22 +171,13 @@ def server(token: str, uds: Path) -> FastMCP:
             "selected": "no",
             # Removed "pin": "no" to preserve existing pin status
             "edit": "no",
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
         if id is not None:
             params["id"] = id
         if title is not None:
             params["title"] = title
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/open-note?{urlencode(params, quote_via=quote)}")
-            return Note.model_validate(_fix_tags(await future))
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        return Note.model_validate(_fix_tags(await _request(ctx, "open-note", params)))
 
     @mcp.tool()
     async def create(
@@ -177,14 +188,11 @@ def server(token: str, uds: Path) -> FastMCP:
         timestamp: bool = Field(description="prepend the current date and time to the text", default=False),
     ) -> NoteID:
         """Create a new note and return its unique identifier. Empty notes are not allowed."""
-        req_id = ctx.request_id
         params = {
             "open_note": "no",
             "new_window": "no",
             "float": "no",
             "show_window": "no",
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
         if title is not None:
             params["title"] = title
@@ -198,14 +206,7 @@ def server(token: str, uds: Path) -> FastMCP:
         if timestamp:
             params["timestamp"] = "yes"
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/create?{urlencode(params, quote_via=quote)}")
-            return NoteID.model_validate(await future)
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        return NoteID.model_validate(await _request(ctx, "create", params))
 
     @mcp.tool()
     async def replace_note(
@@ -217,7 +218,6 @@ def server(token: str, uds: Path) -> FastMCP:
         timestamp: bool = Field(description="prepend the current date and time to the text", default=False),
     ) -> ModifiedNote:
         """Replace the content of an existing note identified by its id."""
-        req_id = ctx.request_id
         mode = "replace_all" if title is not None else "replace"
         params = {
             "mode": mode,
@@ -225,8 +225,6 @@ def server(token: str, uds: Path) -> FastMCP:
             "new_window": "no",
             "show_window": "no",
             "edit": "no",
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
         if id is not None:
             params["id"] = id
@@ -239,14 +237,7 @@ def server(token: str, uds: Path) -> FastMCP:
         if timestamp:
             params["timestamp"] = "yes"
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/add-text?{urlencode(params, quote_via=quote)}")
-            return ModifiedNote.model_validate(await future)
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        return ModifiedNote.model_validate(await _request(ctx, "add-text", params))
 
     @mcp.tool()
     async def add_file(
@@ -261,8 +252,6 @@ def server(token: str, uds: Path) -> FastMCP:
         mode: str | None = Field(description="adding mode (prepend, append)", default=None),
     ) -> None:
         """Append or prepend a file to a note identified by its title or id."""
-        req_id = ctx.request_id
-
         if file.startswith("http://") or file.startswith("https://"):
             res = requests.get(file)
             res.raise_for_status()
@@ -270,14 +259,12 @@ def server(token: str, uds: Path) -> FastMCP:
 
         params = {
             "selected": "no",
-            "file": file,
-            "filename": filename,
             "open_note": "no",
             "new_window": "no",
             "show_window": "no",
             "edit": "no",
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
+            "file": file,
+            "filename": filename,
         }
         if id is not None:
             params["id"] = id
@@ -288,42 +275,24 @@ def server(token: str, uds: Path) -> FastMCP:
         if mode is not None:
             params["mode"] = mode
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/add-file?{urlencode(sorted(params.items()), quote_via=quote)}")
-            await future
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        await _request(ctx, "add-file", params)
 
     @mcp.tool()
     async def tags(
         ctx: Context[Any, AppContext],
     ) -> list[str]:
         """Return all the tags currently displayed in Bear’s sidebar."""
-        req_id = ctx.request_id
         params = {
             "token": token,
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/tags?{urlencode(params, quote_via=quote)}")
-            res = await future
+        res = await _request(ctx, "tags", params)
+        raw_tags = res.get("tags")
+        if raw_tags is None:
+            return []
 
-            raw_tags = res.get("tags")
-            if raw_tags is None:
-                return []
-
-            notes = cast(list[dict[str, str]], json.loads(raw_tags))
-            return [note["name"] for note in notes if "name" in note]
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        notes = cast(list[dict[str, str]], json.loads(raw_tags))
+        return [note["name"] for note in notes if "name" in note]
 
     @mcp.tool()
     async def open_tag(
@@ -331,23 +300,13 @@ def server(token: str, uds: Path) -> FastMCP:
         name: str = Field(description="tag name or a list of tags divided by comma"),
     ) -> list[NoteInfo]:
         """Show all the notes which have a selected tag in bear."""
-        req_id = ctx.request_id
         params = {
             "name": name,
             "token": token,
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/open-tag?{urlencode(params, quote_via=quote)}")
-            res = await future
-            return parse_notes(res.get("notes"))
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        res = await _request(ctx, "open-tag", params)
+        return parse_notes(res.get("notes"))
 
     @mcp.tool()
     async def rename_tag(
@@ -360,23 +319,13 @@ def server(token: str, uds: Path) -> FastMCP:
         This call can’t be performed if the app is a locked state.
         If the tag contains any locked note this call will not be performed.
         """
-        req_id = ctx.request_id
         params = {
             "name": name,
             "new_name": new_name,
             "show_window": "no",
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/rename-tag?{urlencode(params, quote_via=quote)}")
-            await future
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        await _request(ctx, "rename-tag", params)
 
     @mcp.tool()
     async def delete_tag(
@@ -388,43 +337,24 @@ def server(token: str, uds: Path) -> FastMCP:
          This call can’t be performed if the app is a locked state.
         If the tag contains any locked note this call will not be performed.
         """
-        req_id = ctx.request_id
         params = {
             "name": name,
             "show_window": "no",
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/delete-tag?{urlencode(params, quote_via=quote)}")
-            await future
+        await _request(ctx, "delete-tag", params)
 
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
-
-    async def move_note(ctx: AppContext, req_id: str, id: str | None, search: str | None, dest: str) -> None:
+    async def move_note(ctx: Context[Any, AppContext], id: str | None, search: str | None, dest: str) -> None:
         """Move a note identified by its title or id to the given destination."""
         params = {
             "show_window": "no",
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
         if id is not None:
             params["id"] = id
         if search is not None:
             params["search"] = search
 
-        future = Future[QueryParams]()
-        ctx.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/{dest}?{urlencode(params, quote_via=quote)}")
-            await future
-
-        finally:
-            del ctx.futures[req_id]
+        await _request(ctx, dest, params)
 
     @mcp.tool()
     async def trash(
@@ -437,7 +367,7 @@ def server(token: str, uds: Path) -> FastMCP:
         This call can’t be performed if the app is a locked state. Encrypted notes can’t be used with this call.
         The search term is ignored if an id is provided.
         """
-        await move_note(ctx.request_context.lifespan_context, ctx.request_id, id, search, "trash")
+        await move_note(ctx, id, search, "trash")
 
     @mcp.tool()
     async def archive(
@@ -450,28 +380,19 @@ def server(token: str, uds: Path) -> FastMCP:
         This call can’t be performed if the app is a locked state. Encrypted notes can’t be accessed with this call.
         The search term is ignored if an id is provided.
         """
-        await move_note(ctx.request_context.lifespan_context, ctx.request_id, id, search, "archive")
+        await move_note(ctx, id, search, "archive")
 
-    async def sidebar_items(ctx: AppContext, req_id: str, kind: str, search: str | None) -> list[NoteInfo]:
+    async def sidebar_items(ctx: Context[Any, AppContext], kind: str, search: str | None) -> list[NoteInfo]:
         """List notes in the specified sidebar."""
         params = {
             "show_window": "no",
             "token": token,
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
         if search is not None:
             params["search"] = search
 
-        future = Future[QueryParams]()
-        ctx.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/{kind}?{urlencode(params, quote_via=quote)}")
-            res = await future
-            return parse_notes(res.get("notes"))
-
-        finally:
-            del ctx.futures[req_id]
+        res = await _request(ctx, kind, params)
+        return parse_notes(res.get("notes"))
 
     @mcp.tool()
     async def untagged(
@@ -479,7 +400,7 @@ def server(token: str, uds: Path) -> FastMCP:
         search: str | None = Field(description="string to search", default=None),
     ) -> list[NoteInfo]:
         """Select the Untagged sidebar item."""
-        return await sidebar_items(ctx.request_context.lifespan_context, ctx.request_id, "untagged", search)
+        return await sidebar_items(ctx, "untagged", search)
 
     @mcp.tool()
     async def todo(
@@ -487,7 +408,7 @@ def server(token: str, uds: Path) -> FastMCP:
         search: str | None = Field(description="string to search", default=None),
     ) -> list[NoteInfo]:
         """Select the Todo sidebar item."""
-        return await sidebar_items(ctx.request_context.lifespan_context, ctx.request_id, "todo", search)
+        return await sidebar_items(ctx, "todo", search)
 
     @mcp.tool()
     async def today(
@@ -495,7 +416,7 @@ def server(token: str, uds: Path) -> FastMCP:
         search: str | None = Field(description="string to search", default=None),
     ) -> list[NoteInfo]:
         """Select the Today sidebar item."""
-        return await sidebar_items(ctx.request_context.lifespan_context, ctx.request_id, "today", search)
+        return await sidebar_items(ctx, "today", search)
 
     @mcp.tool()
     async def locked(
@@ -503,7 +424,7 @@ def server(token: str, uds: Path) -> FastMCP:
         search: str | None = Field(description="string to search", default=None),
     ) -> list[NoteInfo]:
         """Select the Locked sidebar item."""
-        return await sidebar_items(ctx.request_context.lifespan_context, ctx.request_id, "locked", search)
+        return await sidebar_items(ctx, "locked", search)
 
     @mcp.tool()
     async def search(
@@ -512,27 +433,17 @@ def server(token: str, uds: Path) -> FastMCP:
         tag: str | None = Field(description="tag to search into", default=None),
     ) -> list[NoteInfo]:
         """Show search results in Bear for all notes or for a specific tag."""
-        req_id = ctx.request_id
         params = {
             "show_window": "no",
             "token": token,
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
         if term is not None:
             params["term"] = term
         if tag is not None:
             params["tag"] = tag
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/search?{urlencode(params, quote_via=quote)}")
-            res = await future
-            return parse_notes(res.get("notes"))
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        res = await _request(ctx, "search", params)
+        return parse_notes(res.get("notes"))
 
     @mcp.tool()
     async def grab_url(
@@ -544,23 +455,13 @@ def server(token: str, uds: Path) -> FastMCP:
         ),
     ) -> NoteID:
         """Create a new note with the content of a web page and return its unique identifier."""
-        req_id = ctx.request_id
         params = {
             "url": url,
-            "x-success": f"xfwder://{uds.stem}/{req_id}/success",
-            "x-error": f"xfwder://{uds.stem}/{req_id}/error",
         }
         if tags is not None:
             params["tags"] = ",".join(tags)
 
-        future = Future[QueryParams]()
-        ctx.request_context.lifespan_context.futures[req_id] = future
-        try:
-            webbrowser.open(f"{BASE_URL}/grab-url?{urlencode(params, quote_via=quote)}")
-            return NoteID.model_validate(await future)
-
-        finally:
-            del ctx.request_context.lifespan_context.futures[req_id]
+        return NoteID.model_validate(await _request(ctx, "grab-url", params))
 
     return mcp
 
