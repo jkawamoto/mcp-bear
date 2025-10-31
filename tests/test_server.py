@@ -8,7 +8,6 @@
 
 # type: ignore
 import json
-import os
 import random
 import webbrowser
 from pathlib import Path
@@ -41,9 +40,6 @@ def temp_socket() -> Generator[Path, None, None]:
         if not uds.exists():
             break
     yield uds
-
-    if uds.exists():
-        os.unlink(uds)
 
 
 @pytest.fixture
@@ -140,10 +136,10 @@ async def test_open_note(
         "open_note": "no",
         "selected": "no",
         "edit": "no",
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/open-note?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -196,10 +192,10 @@ async def test_create(
         "new_window": "no",
         "float": "no",
         "show_window": "no",
+        **expect_req_params,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(expect_req_params)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/create?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -259,10 +255,10 @@ async def test_replace_note(
         "new_window": "no",
         "show_window": "no",
         "edit": "no",
+        **expect_req_params,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(expect_req_params)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-text?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -284,19 +280,33 @@ async def test_replace_note_failed(
     [
         (
             {"id": "123456", "file": "dGVzdA==", "filename": "test.txt"},
-            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt"},
+            {"file": "dGVzdA==", "filename": "test.txt", "id": "123456"},
         ),
         (
             {"title": "sample note", "file": "dGVzdA==", "filename": "test.txt"},
-            {"title": "sample note", "file": "dGVzdA==", "filename": "test.txt"},
+            {
+                "file": "dGVzdA==",
+                "filename": "test.txt",
+                "title": "sample note",
+            },
         ),
         (
             {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "header": "supplement"},
-            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "header": "supplement"},
+            {
+                "file": "dGVzdA==",
+                "filename": "test.txt",
+                "id": "123456",
+                "header": "supplement",
+            },
         ),
         (
             {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "mode": "prepend"},
-            {"id": "123456", "file": "dGVzdA==", "filename": "test.txt", "mode": "prepend"},
+            {
+                "file": "dGVzdA==",
+                "filename": "test.txt",
+                "id": "123456",
+                "mode": "prepend",
+            },
         ),
     ],
 )
@@ -319,13 +329,11 @@ async def test_add_file(
         "new_window": "no",
         "show_window": "no",
         "edit": "no",
+        **expect_req_params,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(expect_req_params)
-    mock_webbrowser.assert_called_once_with(
-        f"{BASE_URL}/add-file?{urlencode(sorted(req_params.items()), quote_via=quote)}"
-    )
+    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-file?{urlencode(req_params, quote_via=quote)}")
 
 
 @pytest.mark.anyio
@@ -334,11 +342,19 @@ async def test_add_file(
     [
         (
             {"id": "123456", "file": "http://example.com", "filename": "test.txt"},
-            {"id": "123456", "file": "bW9ja2VkIGh0dHAgcmVxdWVzdA==", "filename": "test.txt"},
+            {
+                "file": "bW9ja2VkIGh0dHAgcmVxdWVzdA==",
+                "filename": "test.txt",
+                "id": "123456",
+            },
         ),
         (
             {"title": "sample note", "file": "https://example.com", "filename": "test.txt"},
-            {"title": "sample note", "file": "bW9ja2VkIGh0dHAgcmVxdWVzdA==", "filename": "test.txt"},
+            {
+                "file": "bW9ja2VkIGh0dHAgcmVxdWVzdA==",
+                "filename": "test.txt",
+                "title": "sample note",
+            },
         ),
     ],
 )
@@ -362,13 +378,11 @@ async def test_add_file_http_request(
         "new_window": "no",
         "show_window": "no",
         "edit": "no",
+        **expect_req_params,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(expect_req_params)
-    mock_webbrowser.assert_called_once_with(
-        f"{BASE_URL}/add-file?{urlencode(sorted(req_params.items()), quote_via=quote)}"
-    )
+    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-file?{urlencode(req_params, quote_via=quote)}")
     mock_requests_get.assert_called_once_with(arguments["file"])
 
 
@@ -562,10 +576,10 @@ async def test_trash(
 
     req_params = {
         "show_window": "no",
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/trash?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -599,10 +613,10 @@ async def test_archive(
 
     req_params = {
         "show_window": "no",
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/archive?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -649,10 +663,10 @@ async def test_untagged(
     req_params = {
         "show_window": "no",
         "token": BEAR_TOKEN,
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/untagged?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -699,10 +713,10 @@ async def test_todo(
     req_params = {
         "show_window": "no",
         "token": BEAR_TOKEN,
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/todo?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -749,10 +763,10 @@ async def test_today(
     req_params = {
         "show_window": "no",
         "token": BEAR_TOKEN,
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/today?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -799,10 +813,10 @@ async def test_locked(
     req_params = {
         "show_window": "no",
         "token": BEAR_TOKEN,
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/locked?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -851,10 +865,10 @@ async def test_search(
     req_params = {
         "show_window": "no",
         "token": BEAR_TOKEN,
+        **arguments,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update(arguments)
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/search?{urlencode(req_params, quote_via=quote)}")
 
 
@@ -890,12 +904,13 @@ async def test_grab_url(
     assert res == expect
     assert len(ctx.request_context.lifespan_context.futures) == 0
 
+    additional_params = {"tags": ",".join(tags)} if tags else {}
     req_params = {
         "url": "https://bear.app",
+        **additional_params,
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    req_params.update({"tags": ",".join(tags)} if tags else {})
     mock_webbrowser.assert_called_once_with(f"{BASE_URL}/grab-url?{urlencode(req_params, quote_via=quote)}")
 
 
