@@ -8,7 +8,6 @@
 
 # type: ignore
 import json
-import os
 import random
 import webbrowser
 from pathlib import Path
@@ -41,9 +40,6 @@ def temp_socket() -> Generator[Path, None, None]:
         if not uds.exists():
             break
     yield uds
-
-    if uds.exists():
-        os.unlink(uds)
 
 
 @pytest.fixture

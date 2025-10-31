@@ -9,6 +9,7 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import webbrowser
 from asyncio import Future
 from contextlib import asynccontextmanager
@@ -93,6 +94,9 @@ async def app_lifespan(_server: FastMCP, uds: Path) -> AsyncIterator[AppContext]
         LOGGER.info("Stopping callback server")
         server.should_exit = True
         await server_task
+
+        if uds.exists():
+            os.unlink(uds)
 
 
 class Note(BaseModel):
