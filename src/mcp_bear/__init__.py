@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from functools import partial
 from http import HTTPStatus
 from pathlib import Path
-from typing import cast, AsyncIterator, Final, Any, Mapping
+from typing import cast, AsyncIterator, Final, Any, Mapping, Literal
 from urllib.parse import urlencode, quote
 
 import requests
@@ -253,7 +253,7 @@ def server(token: str, uds: Path) -> FastMCP:
             description="if specified add the file to the corresponding header inside the note", default=None
         ),
         filename: str = Field(description="file name with extension"),
-        mode: str | None = Field(description="adding mode (prepend, append)", default=None),
+        mode: Literal["prepend", "append"] | None = Field(description="adding mode", default=None),
     ) -> None:
         """Append or prepend a file to a note identified by its title or id."""
         if file.startswith("http://") or file.startswith("https://"):
