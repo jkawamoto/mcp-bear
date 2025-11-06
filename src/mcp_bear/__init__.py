@@ -244,6 +244,26 @@ def server(token: str, uds: Path) -> FastMCP:
         return ModifiedNote.model_validate(await _request(ctx, "add-text", params))
 
     @mcp.tool()
+    async def add_title(
+        ctx: Context[Any, AppContext],
+        id: str = Field(description="note unique identifier"),
+        title: str = Field(description="new title for the note"),
+    ) -> None:
+        """Add a title to a note identified by its id."""
+        if not title.startswith("# "):
+            title = "# " + title
+        params = {
+            "id": id,
+            "text": title,
+            "mode": "prepend",
+            "open_note": "no",
+            "new_window": "no",
+            "show_window": "no",
+            "edit": "no",
+        }
+        await _request(ctx, "add-text", params)
+
+    @mcp.tool()
     async def add_file(
         ctx: Context[Any, AppContext],
         id: str | None = Field(description="note unique identifier", default=None),

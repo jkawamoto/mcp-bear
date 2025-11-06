@@ -276,6 +276,53 @@ async def test_replace_note_failed(
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
+    "argument,expect",
+    [
+        ("title", "# title"),
+        ("# title", "# title"),
+    ],
+)
+async def test_add_title(
+    temp_socket: Path,
+    mcp_server: Tuple[FastMCP, Context],
+    mock_webbrowser: MagicMock,
+    argument: str,
+    expect: str,
+) -> None:
+    s, ctx = mcp_server
+    mock_webbrowser.stubbed_queries = {}
+
+    await s._tool_manager.call_tool("add_title", arguments={"id": "123", "title": argument}, context=ctx)
+    assert len(ctx.request_context.lifespan_context.futures) == 0
+
+    req_params = {
+        "id": "123",
+        "text": expect,
+        "mode": "prepend",
+        "open_note": "no",
+        "new_window": "no",
+        "show_window": "no",
+        "edit": "no",
+        "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
+        "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
+    }
+    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-text?{urlencode(req_params, quote_via=quote)}")
+
+
+@pytest.mark.anyio
+async def test_add_title_failed(
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+) -> None:
+    s, ctx = mcp_server
+    with pytest.raises(ToolError) as excinfo:
+        await s._tool_manager.call_tool("add_title", arguments={"id": "123456", "title": "new title"}, context=ctx)
+
+    assert "test error message" in str(excinfo.value)
+    assert len(ctx.request_context.lifespan_context.futures) == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
     "arguments,expect_req_params",
     [
         (
