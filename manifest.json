@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "mcp-bear",
   "display_name": "Bear MCP Server",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A MCP server for interacting with Bear note-taking software.",
   "author": {
     "name": "Junpei Kawamoto",
