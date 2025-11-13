@@ -10,7 +10,6 @@ import base64
 import json
 import logging
 import os
-import webbrowser
 from asyncio import Future
 from contextlib import asynccontextmanager
 from copy import deepcopy
@@ -154,7 +153,15 @@ def server(token: str, uds: Path) -> FastMCP:
         future = Future[QueryParams]()
         ctx.request_context.lifespan_context.futures[req_id] = future
         try:
-            webbrowser.open(f"{BASE_URL}/{path}?{urlencode(params, quote_via=quote)}")
+            proc = await asyncio.create_subprocess_exec(
+                "open",
+                "-g",
+                "-j",
+                f"{BASE_URL}/{path}?{urlencode(params, quote_via=quote)}",
+            )
+            returncode = await proc.wait()
+            if returncode != 0:
+                raise RuntimeError(f"failed to open Bear (exit code: {returncode}).")
             return await future
 
         finally:
