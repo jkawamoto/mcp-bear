@@ -1,8 +1,9 @@
 {
-  "manifest_version": "0.2",
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/refs/heads/main/schemas/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
   "name": "mcp-bear",
   "display_name": "Bear MCP Server",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "A MCP server for interacting with Bear note-taking software.",
   "author": {
     "name": "Junpei Kawamoto",
@@ -107,7 +108,9 @@
     }
   },
   "keywords": [
-    "bear"
+    "bear",
+    "notetaking",
+    "macos"
   ],
   "license": "MIT",
   "repository": {
