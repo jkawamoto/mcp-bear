@@ -6,10 +6,10 @@
 #
 #  http://opensource.org/licenses/mit-license.php
 
-# type: ignore
+import asyncio
 import json
 import random
-import webbrowser
+from asyncio.subprocess import Process
 from pathlib import Path
 from typing import Generator, Tuple, AsyncGenerator, Any
 from unittest.mock import patch, MagicMock
@@ -45,10 +45,10 @@ def temp_socket() -> Generator[Path, None, None]:
 @pytest.fixture
 async def mcp_server(temp_socket: Path) -> AsyncGenerator[Tuple[FastMCP, Context[Any, AppContext]], None]:
     s = server(BEAR_TOKEN, temp_socket)
-    async with s._mcp_server.lifespan(s) as lifespan_context:
+    async with s._mcp_server.lifespan(s) as lifespan_context:  # type: ignore
         # noinspection PyTypeChecker
         ctx = Context(
-            request_context=RequestContext(
+            request_context=RequestContext(  # type: ignore
                 request_id=random.randint(1, 100),
                 meta=None,
                 session=None,
@@ -61,36 +61,38 @@ async def mcp_server(temp_socket: Path) -> AsyncGenerator[Tuple[FastMCP, Context
 
 
 @pytest.fixture
-def mock_webbrowser() -> Generator[MagicMock, None, None]:
-    original_open = webbrowser.open
+def mock_create_subprocess_exec() -> Generator[MagicMock, None, None]:
+    original_exec = asyncio.create_subprocess_exec
 
-    with patch("webbrowser.open") as mock_open:
+    with patch("asyncio.create_subprocess_exec") as mock_exec:
 
-        def side_effect(url, _new=0, _autoraise=True) -> bool:
-            queries = parse_qs(urlparse(url).query)
-            callback_url = queries.get("x-success")[0]
+        async def side_effect(cmd: str, *args: str, **_kwargs: Any) -> Process:
+            queries = parse_qs(urlparse(args[2]).query)
+            callback_url = (queries.get("x-success") or [""])[0]
 
-            return original_open(f"{callback_url}?{urlencode(mock_open.stubbed_queries, quote_via=quote)}")
+            return await original_exec(
+                cmd, args[0], args[1], f"{callback_url}?{urlencode(mock_exec.stubbed_queries, quote_via=quote)}"
+            )
 
-        mock_open.side_effect = side_effect
-        yield mock_open
+        mock_exec.side_effect = side_effect
+        yield mock_exec
 
 
 @pytest.fixture
-def mock_webbrowser_error() -> Generator[MagicMock, None, None]:
-    original_open = webbrowser.open
+def mock_create_subprocess_exec_error() -> Generator[MagicMock, None, None]:
+    original_exec = asyncio.create_subprocess_exec
 
-    with patch("webbrowser.open") as mock_open:
+    with patch("asyncio.create_subprocess_exec") as mock_exec:
 
-        def side_effect(url, _new=0, _autoraise=True) -> bool:
-            queries = parse_qs(urlparse(url).query)
-            callback_url = queries.get("x-error")[0]
+        async def side_effect(cmd: str, *args: str, **_kwargs: Any) -> Process:
+            queries = parse_qs(urlparse(args[2]).query)
+            callback_url = (queries.get("x-error") or [""])[0]
             params = {"error-Code": "499", "errorMessage": "test error message"}
 
-            return original_open(f"{callback_url}?{urlencode(params, quote_via=quote)}")
+            return await original_exec(cmd, args[0], args[1], f"{callback_url}?{urlencode(params, quote_via=quote)}")
 
-        mock_open.side_effect = side_effect
-        yield mock_open
+        mock_exec.side_effect = side_effect
+        yield mock_exec
 
 
 @pytest.fixture
@@ -110,7 +112,7 @@ def mock_requests_get() -> Generator[MagicMock, None, None]:
 async def test_open_note(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
@@ -121,9 +123,8 @@ async def test_open_note(
         tags=["a", "b"],
         modificationDate="2023-01-01T00:00:00Z",
         creationDate="2023-01-01T00:00:00Z",
-        body="test note",
     )
-    mock_webbrowser.stubbed_queries = _encode_tags(expect.model_dump())
+    mock_create_subprocess_exec.stubbed_queries = _encode_tags(expect.model_dump())
 
     res = await s._tool_manager.call_tool("open_note", arguments=arguments, context=ctx)
     assert res == expect
@@ -140,12 +141,14 @@ async def test_open_note(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/open-note?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/open-note?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_open_note_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -175,13 +178,13 @@ async def test_open_note_failed(
 async def test_create(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
     expect_req_params: dict,
 ) -> None:
     s, ctx = mcp_server
     expect = NoteID(identifier="1234567890", title="test title")
-    mock_webbrowser.stubbed_queries = expect.model_dump()
+    mock_create_subprocess_exec.stubbed_queries = expect.model_dump()
 
     res = await s._tool_manager.call_tool("create", arguments=arguments, context=ctx)
     assert res == expect
@@ -196,12 +199,14 @@ async def test_create(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/create?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/create?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_create_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -237,13 +242,13 @@ async def test_create_failed(
 async def test_replace_note(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
     expect_req_params: dict,
 ) -> None:
     s, ctx = mcp_server
     expect = ModifiedNote(note="updated note", title="test title")
-    mock_webbrowser.stubbed_queries = expect.model_dump()
+    mock_create_subprocess_exec.stubbed_queries = expect.model_dump()
 
     res = await s._tool_manager.call_tool("replace_note", arguments=arguments, context=ctx)
     assert res == expect
@@ -259,12 +264,14 @@ async def test_replace_note(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-text?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/add-text?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_replace_note_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -285,12 +292,12 @@ async def test_replace_note_failed(
 async def test_add_title(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     argument: str,
     expect: str,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {}
+    mock_create_subprocess_exec.stubbed_queries = {}
 
     await s._tool_manager.call_tool("add_title", arguments={"id": "123", "title": argument}, context=ctx)
     assert len(ctx.request_context.lifespan_context.futures) == 0
@@ -306,12 +313,14 @@ async def test_add_title(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-text?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/add-text?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_add_title_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -360,12 +369,12 @@ async def test_add_title_failed(
 async def test_add_file(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
     expect_req_params: dict,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {}
+    mock_create_subprocess_exec.stubbed_queries = {}
 
     await s._tool_manager.call_tool("add_file", arguments=arguments, context=ctx)
     assert len(ctx.request_context.lifespan_context.futures) == 0
@@ -380,7 +389,9 @@ async def test_add_file(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-file?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/add-file?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
@@ -408,13 +419,13 @@ async def test_add_file(
 async def test_add_file_http_request(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     mock_requests_get: MagicMock,
     arguments: dict,
     expect_req_params: dict,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {}
+    mock_create_subprocess_exec.stubbed_queries = {}
 
     await s._tool_manager.call_tool("add_file", arguments=arguments, context=ctx)
     assert len(ctx.request_context.lifespan_context.futures) == 0
@@ -429,13 +440,15 @@ async def test_add_file_http_request(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/add-file?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/add-file?{urlencode(req_params, quote_via=quote)}"
+    )
     mock_requests_get.assert_called_once_with(arguments["file"])
 
 
 @pytest.mark.anyio
 async def test_add_file_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -449,11 +462,11 @@ async def test_add_file_failed(
 async def test_tags(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
 ) -> None:
     s, ctx = mcp_server
 
-    mock_webbrowser.stubbed_queries = {
+    mock_create_subprocess_exec.stubbed_queries = {
         "tags": json.dumps(
             [
                 {"name": "a"},
@@ -472,12 +485,14 @@ async def test_tags(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/tags?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/tags?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_tags_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -491,7 +506,7 @@ async def test_tags_failed(
 async def test_open_tag(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
 ) -> None:
     s, ctx = mcp_server
     expect = [
@@ -507,7 +522,7 @@ async def test_open_tag(
         ),
     ]
 
-    mock_webbrowser.stubbed_queries = {
+    mock_create_subprocess_exec.stubbed_queries = {
         "notes": json.dumps([info.model_dump() for info in expect]),
     }
 
@@ -521,12 +536,14 @@ async def test_open_tag(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/open-tag?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/open-tag?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_open_tag_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -540,10 +557,10 @@ async def test_open_tag_failed(
 async def test_rename_tag(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {}
+    mock_create_subprocess_exec.stubbed_queries = {}
 
     await s._tool_manager.call_tool("rename_tag", arguments={"name": "old name", "new_name": "new name"}, context=ctx)
     assert len(ctx.request_context.lifespan_context.futures) == 0
@@ -555,12 +572,14 @@ async def test_rename_tag(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/rename-tag?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/rename-tag?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_rename_tag_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -576,10 +595,10 @@ async def test_rename_tag_failed(
 async def test_delete_tag(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {}
+    mock_create_subprocess_exec.stubbed_queries = {}
 
     await s._tool_manager.call_tool("delete_tag", arguments={"name": "tag name"}, context=ctx)
     assert len(ctx.request_context.lifespan_context.futures) == 0
@@ -590,12 +609,14 @@ async def test_delete_tag(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/delete-tag?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/delete-tag?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_delete_tag_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -612,11 +633,11 @@ async def test_delete_tag_failed(
 async def test_trash(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {}
+    mock_create_subprocess_exec.stubbed_queries = {}
 
     await s._tool_manager.call_tool("trash", arguments=arguments, context=ctx)
     assert len(ctx.request_context.lifespan_context.futures) == 0
@@ -627,12 +648,14 @@ async def test_trash(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/trash?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/trash?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_trash_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -649,11 +672,11 @@ async def test_trash_failed(
 async def test_archive(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
-    mock_webbrowser.stubbed_queries = {}
+    mock_create_subprocess_exec.stubbed_queries = {}
 
     await s._tool_manager.call_tool("archive", arguments=arguments, context=ctx)
     assert len(ctx.request_context.lifespan_context.futures) == 0
@@ -664,12 +687,14 @@ async def test_archive(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/archive?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/archive?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_archive_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -684,7 +709,7 @@ async def test_archive_failed(
 async def test_untagged(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
@@ -701,7 +726,7 @@ async def test_untagged(
         ),
     ]
 
-    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
+    mock_create_subprocess_exec.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("untagged", arguments=arguments, context=ctx)
     assert res == expect
@@ -714,12 +739,14 @@ async def test_untagged(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/untagged?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/untagged?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_untagged_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -734,7 +761,7 @@ async def test_untagged_failed(
 async def test_todo(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
@@ -751,7 +778,7 @@ async def test_todo(
         ),
     ]
 
-    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
+    mock_create_subprocess_exec.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("todo", arguments=arguments, context=ctx)
     assert res == expect
@@ -764,12 +791,14 @@ async def test_todo(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/todo?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/todo?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_todo_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -784,7 +813,7 @@ async def test_todo_failed(
 async def test_today(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
@@ -801,7 +830,7 @@ async def test_today(
         ),
     ]
 
-    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
+    mock_create_subprocess_exec.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("today", arguments=arguments, context=ctx)
     assert res == expect
@@ -814,12 +843,14 @@ async def test_today(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/today?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/today?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_today_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -834,7 +865,7 @@ async def test_today_failed(
 async def test_locked(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
@@ -851,7 +882,7 @@ async def test_locked(
         ),
     ]
 
-    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
+    mock_create_subprocess_exec.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("locked", arguments=arguments, context=ctx)
     assert res == expect
@@ -864,12 +895,14 @@ async def test_locked(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/locked?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/locked?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_locked_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -886,7 +919,7 @@ async def test_locked_failed(
 async def test_search(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     arguments: dict,
 ) -> None:
     s, ctx = mcp_server
@@ -903,7 +936,7 @@ async def test_search(
         ),
     ]
 
-    mock_webbrowser.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
+    mock_create_subprocess_exec.stubbed_queries = {"notes": json.dumps([info.model_dump() for info in expect])}
 
     res = await s._tool_manager.call_tool("search", arguments=arguments, context=ctx)
     assert res == expect
@@ -916,12 +949,14 @@ async def test_search(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/search?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/search?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_search_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
@@ -936,15 +971,15 @@ async def test_search_failed(
 async def test_grab_url(
     temp_socket: Path,
     mcp_server: Tuple[FastMCP, Context],
-    mock_webbrowser: MagicMock,
+    mock_create_subprocess_exec: MagicMock,
     tags: list[str] | None,
 ) -> None:
     s, ctx = mcp_server
     expect = NoteID(identifier="1234567890", title="test title")
 
-    mock_webbrowser.stubbed_queries = expect.model_dump()
+    mock_create_subprocess_exec.stubbed_queries = expect.model_dump()
 
-    arguments = {"url": "https://bear.app"}
+    arguments: dict[str, Any] = {"url": "https://bear.app"}
     arguments.update({"tags": tags} if tags else {})
 
     res = await s._tool_manager.call_tool("grab_url", arguments=arguments, context=ctx)
@@ -958,12 +993,14 @@ async def test_grab_url(
         "x-success": f"xfwder://{temp_socket.stem}/{ctx.request_id}/success",
         "x-error": f"xfwder://{temp_socket.stem}/{ctx.request_id}/error",
     }
-    mock_webbrowser.assert_called_once_with(f"{BASE_URL}/grab-url?{urlencode(req_params, quote_via=quote)}")
+    mock_create_subprocess_exec.assert_called_once_with(
+        "open", "-g", "-j", f"{BASE_URL}/grab-url?{urlencode(req_params, quote_via=quote)}"
+    )
 
 
 @pytest.mark.anyio
 async def test_grab_url_failed(
-    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_webbrowser_error: MagicMock
+    mcp_server: Tuple[FastMCP, Context[Any, AppContext]], mock_create_subprocess_exec_error: MagicMock
 ) -> None:
     s, ctx = mcp_server
     with pytest.raises(ToolError) as excinfo:
