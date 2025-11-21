@@ -6,7 +6,7 @@
 
 A MCP server for interacting with [Bear](https://bear.app/) note-taking software.
 
-<a href="https://glama.ai/mcp/servers/2gg54jdwwv"><img width="380" height="200" src="https://glama.ai/mcp/servers/2gg54jdwwv/badge" alt="Bear Server MCP server" /></a>
+<img src="icon.png" width="256" height="256" alt="Bear MCP Server Icon">
 
 ## Installation
 > [!NOTE]

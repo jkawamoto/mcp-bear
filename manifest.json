@@ -13,6 +13,7 @@
   "homepage": "https://github.com/jkawamoto/mcp-bear",
   "documentation": "https://github.com/jkawamoto/mcp-bear",
   "support": "https://github.com/jkawamoto/mcp-bear/issues",
+  "icon": "icon.png",
   "server": {
     "type": "python",
     "entry_point": "src/mcp_bear/__main__.py",
