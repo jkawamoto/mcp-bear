@@ -12,9 +12,18 @@ A MCP server for interacting with [Bear](https://bear.app/) note-taking software
 > [!NOTE]
 > You'll need [`uv`](https://docs.astral.sh/uv) installed on your system to use `uvx` command.
 
-### For Goose CLI
-To enable the Bear extension in Goose CLI,
-edit the configuration file `~/.config/goose/config.yaml` to include the following entry:
+### [goose](https://block.github.io/goose/)
+Open this link
+```
+goose://extension?cmd=uvx&arg=--from&arg=git%2Bhttps%3A%2F%2Fgithub.com%2Fjkawamoto%2Fmcp-bear&arg=mcp-bear&id=bear&name=Bear&description=Interacting%20with%20Bear%20note-taking%20software&env=BEAR_API_TOKEN
+```
+to launch the installer, then click "Yes" to confirm the installation.
+Set `BEAR_API_TOKEN` environment variable to your api token.
+
+<details>
+<summary>Manually configuration</summary>
+
+You can also directly edit the config file (`~/.config/goose/config.yaml`) to include the following entry:
 
 ```yaml
 extensions:
@@ -27,24 +36,18 @@ extensions:
     type: stdio
 ```
 
-### For Goose Desktop
-Add a new extension with the following settings:
+</details>
 
-- **Type**: Standard IO
-- **ID**: bear
-- **Name**: Bear
-- **Description**: Interacting with Bear note-taking software
-- **Command**: `uvx --from git+https://github.com/jkawamoto/mcp-bear mcp-bear`
-- **Environment Variables**: Add `BEAR_API_TOKEN` with your api token
+For more details on configuring MCP servers in Goose, refer to the documentation:
+[Using Extensions | goose](https://block.github.io/goose/docs/getting-started/using-extensions#mcp-servers).
 
-For more details on configuring MCP servers in Goose Desktop,
-refer to the documentation:
-[Using Extensions - MCP Servers](https://block.github.io/goose/docs/getting-started/using-extensions#mcp-servers).
-
-### For Claude Desktop
+### [Claude](https://claude.com/download)
 Download the latest MCP bundle `mcp-bear.mcpb` from
 the [Releases](https://github.com/jkawamoto/mcp-bear/releases) page,
 then open the downloaded `.mcpb `file or drag it into the Claude Desktop's Settings window.
+
+<details>
+<summary>Manually configuration</summary>
 
 You can also manually configure this server for Claude Desktop.
 Edit the `claude_desktop_config.json` file by adding the following entry under `mcpServers`:
@@ -66,10 +69,13 @@ Edit the `claude_desktop_config.json` file by adding the following entry under `
 }
 ```
 After editing, restart the application.
-For more information,
-see: [For Claude Desktop Users - Model Context Protocol](https://modelcontextprotocol.io/quickstart/user).
 
-### For LM Studio
+</details>
+
+For more information,
+see: [Connect to local MCP servers - Model Context Protocol](https://modelcontextprotocol.io/docs/develop/connect-local-servers).
+
+### [LM Studio](https://lmstudio.ai/)
 To configure this server for LM Studio, click the button below.
 
 [![Add MCP Server bear to LM Studio](https://files.lmstudio.ai/deeplink/mcp-install-light.svg)](https://lmstudio.ai/install-mcp?name=bear&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyItLWZyb20iLCJnaXQraHR0cHM6Ly9naXRodWIuY29tL2prYXdhbW90by9tY3AtYmVhciIsIm1jcC1iZWFyIiwiLS10b2tlbiIsIjxZT1VSX1RPS0VOPiJdfQ%3D%3D)
