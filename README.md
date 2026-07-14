@@ -1,3 +1,9 @@
+> [!NOTE]
+> This repository is archived. As of [v2.8](https://blog.bear.app/2026/04/bear-2-8-bearcli-claude-connector-and-mcp-server/),
+> Bear now includes a
+> native [MCP server implementation](https://bear.app/faq/command-line-interface/),
+> making this standalone server unnecessary.
+
 # Bear MCP Server
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Python Application](https://github.com/jkawamoto/mcp-bear/actions/workflows/python-app.yaml/badge.svg)](https://github.com/jkawamoto/mcp-bear/actions/workflows/python-app.yaml)
